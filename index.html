@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#E1001A">
+<title>Carga en Patio — Provefabrica</title>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<style>
+  :root{
+    --rojo:#E1001A; --rojo-osc:#B00014;
+    --tinta:#14161A; --gris:#6B7280; --linea:#E4E6EA;
+    --fondo:#0F1115; --panel:#FFFFFF;
+    --ok:#12A150; --ok-osc:#0E7C3A; --amar:#F5A302;
+    --sombra:0 4px 20px rgba(0,0,0,.15);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;background:var(--fondo);color:var(--tinta);-webkit-font-smoothing:antialiased;overscroll-behavior:none;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+  .app{max-width:520px;width:100%;margin:0 auto;flex:1;display:flex;flex-direction:column;background:#F4F5F7;position:relative;overflow:hidden}
+
+  .top{background:var(--rojo);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;box-shadow:var(--sombra);z-index:20}
+  .top .logo{width:34px;height:34px;background:#fff;color:var(--rojo);border-radius:8px;display:grid;place-items:center;font-weight:800;font-size:18px}
+  .top .t{flex:1;min-width:0}
+  .top .t h1{font-size:15px;font-weight:700;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .top .t p{font-size:11.5px;opacity:.9}
+  .top .placa-badge{background:rgba(255,255,255,.18);padding:5px 10px;border-radius:8px;font-weight:800;letter-spacing:1px;font-size:14px;font-family:ui-monospace,monospace}
+  .top .back{background:rgba(255,255,255,.18);border:none;color:#fff;font-size:20px;width:34px;height:34px;border-radius:8px;cursor:pointer}
+  .top .recarga{background:rgba(255,255,255,.18);border:none;color:#fff;font-size:17px;width:34px;height:34px;border-radius:8px;cursor:pointer}
+
+  .scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .pantalla{display:none;flex-direction:column;height:100%}
+  .pantalla.activa{display:flex}
+
+  /* estados generales (cargando / error) */
+  .centro{margin:auto;text-align:center;padding:30px 24px}
+  .centro .ic{font-size:50px;margin-bottom:14px}
+  .centro h2{font-size:18px;margin-bottom:8px}
+  .centro p{font-size:13.5px;color:var(--gris);margin-bottom:20px;line-height:1.5}
+  .spin{width:42px;height:42px;border:4px solid #dfe3e8;border-top-color:var(--rojo);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 16px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .btn-grande{background:var(--rojo);color:#fff;border:none;border-radius:14px;padding:15px 24px;font-size:15px;font-weight:700;cursor:pointer;width:100%;box-shadow:var(--sombra)}
+  .btn-grande:active{background:var(--rojo-osc)}
+  .btn-ghost{background:#fff;color:var(--rojo);border:1.5px solid var(--linea);border-radius:12px;padding:12px 18px;font-size:14px;font-weight:600;cursor:pointer;width:100%;margin-top:10px}
+
+  /* selector de fecha */
+  .sel-fecha{padding:16px}
+  .sel-fecha h2{font-size:13px;color:var(--gris);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;font-weight:700}
+  .fecha-card{background:var(--panel);border-radius:14px;padding:16px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.08);cursor:pointer;display:flex;align-items:center;gap:14px;border-left:5px solid var(--rojo)}
+  .fecha-card:active{transform:scale(.98)}
+  .fecha-card.hoy{border-left-color:var(--ok)}
+  .fecha-card .cal{width:46px;height:46px;background:var(--rojo);color:#fff;border-radius:11px;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0}
+  .fecha-card.hoy .cal{background:var(--ok)}
+  .fecha-card .cal .d{font-size:19px;font-weight:800;line-height:1}
+  .fecha-card .cal .m{font-size:9px;text-transform:uppercase;letter-spacing:.5px}
+  .fecha-card .info{flex:1;min-width:0}
+  .fecha-card .info .f{font-size:15px;font-weight:700}
+  .fecha-card .info .r{font-size:12.5px;color:var(--gris)}
+  .fecha-card .chev{color:var(--gris);font-size:20px}
+  .badge-hoy{background:var(--ok);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:6px}
+
+  /* lista camiones */
+  .lista-cam{padding:14px}
+  .lista-cam h2{font-size:13px;color:var(--gris);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;font-weight:700}
+  .cam-card{background:var(--panel);border-radius:16px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.08);cursor:pointer;display:flex;align-items:center;gap:14px;border-left:5px solid var(--linea)}
+  .cam-card:active{transform:scale(.98)}
+  .cam-card.completo{border-left-color:var(--ok)}
+  .cam-card.cerrado{border-left-color:var(--tinta);opacity:.75}
+  .cam-card .placa{font-family:ui-monospace,monospace;font-weight:800;font-size:19px;background:var(--tinta);color:#fff;padding:8px 12px;border-radius:10px;letter-spacing:1px}
+  .cam-card .info{flex:1;min-width:0}
+  .cam-card .info .r{font-size:15px;font-weight:700}
+  .cam-card .info .z{font-size:12.5px;color:var(--gris)}
+  .cam-card .prog{text-align:right}
+  .cam-card .prog .big{font-size:20px;font-weight:800;line-height:1}
+  .cam-card .prog .lbl{font-size:11px;color:var(--gris)}
+  .cam-card.completo .prog .big{color:var(--ok)}
+  .mini-barra{height:6px;background:#EDEFF2;border-radius:4px;overflow:hidden;margin-top:8px}
+  .mini-barra span{display:block;height:100%;background:var(--amar);transition:width .3s}
+  .cam-card.completo .mini-barra span{background:var(--ok)}
+
+  .contador{background:var(--tinta);color:#fff;padding:14px 18px;flex-shrink:0;display:flex;align-items:center;gap:14px;z-index:15}
+  .contador.completo{background:var(--ok-osc)}
+  .contador .num{font-size:34px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+  .contador .txt{flex:1;font-size:13px;line-height:1.3}
+  .contador .txt b{font-size:15px;display:block}
+
+  .scan-launch{margin:14px;padding:18px;border:none;border-radius:16px;background:var(--rojo);color:#fff;font-size:17px;font-weight:800;box-shadow:0 4px 14px rgba(225,0,26,.3);display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer}
+  .scan-launch:active{transform:scale(.98)}
+  .scan-launch .ic{font-size:22px}
+
+  .modo-lista{padding:12px}
+  .li-item{background:var(--panel);border-radius:14px;padding:14px;margin-bottom:10px;display:flex;align-items:center;gap:14px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+  .li-item.on{background:#E7F5EC}
+  .li-chk{width:44px;height:44px;border:3px solid var(--linea);border-radius:12px;flex-shrink:0;display:grid;place-items:center;font-size:24px;color:#fff;font-weight:800;cursor:pointer}
+  .li-item.on .li-chk{background:var(--ok);border-color:var(--ok)}
+  .li-info{flex:1;min-width:0}
+  .li-info .fac{font-family:ui-monospace,monospace;font-weight:800;font-size:14px}
+  .li-info .cli{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .li-info .dist{font-size:12px;color:var(--gris)}
+  .li-info .obs-tag{display:inline-block;background:#FFF7E6;color:#8A6D00;font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;margin-top:3px}
+
+  .cierre{flex-shrink:0;background:var(--panel);border-top:1px solid var(--linea);padding:12px 16px;box-shadow:0 -4px 16px rgba(0,0,0,.06)}
+  .cierre input{width:100%;border:2px solid var(--linea);border-radius:12px;padding:12px;font-size:15px;margin-bottom:10px;font-family:inherit}
+  .cierre .btn-cerrar{width:100%;padding:16px;border:none;border-radius:14px;font-size:16px;font-weight:800;cursor:pointer;color:#fff;background:var(--ok);box-shadow:0 4px 14px rgba(18,161,80,.3)}
+  .cierre .btn-cerrar.bloq{background:#C9CDD3;box-shadow:none}
+  .cierre .btn-cerrar.hecho{background:var(--tinta)}
+
+  /* escáner */
+  .scanner{position:fixed;inset:0;background:#000;z-index:200;display:none;flex-direction:column}
+  .scanner.show{display:flex}
+  .scanner video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .scan-overlay{position:absolute;inset:0;display:flex;flex-direction:column;z-index:5}
+  .scan-head{padding:14px 16px;display:flex;align-items:center;gap:12px;background:linear-gradient(rgba(0,0,0,.6),transparent);color:#fff}
+  .scan-head .placa{font-family:ui-monospace,monospace;font-weight:800;background:rgba(255,255,255,.2);padding:5px 10px;border-radius:8px;letter-spacing:1px}
+  .scan-head .cerrar-scan{margin-left:auto;background:rgba(255,255,255,.2);border:none;color:#fff;font-size:20px;width:38px;height:38px;border-radius:10px;cursor:pointer}
+  .mira-wrap{flex:1;display:flex;align-items:center;justify-content:center}
+  .mira{width:82%;height:120px;border:3px solid #fff;border-radius:16px;box-shadow:0 0 0 2000px rgba(0,0,0,.45);position:relative}
+  .mira::before{content:'# FACTURA';position:absolute;top:-26px;left:0;color:#fff;font-size:12px;font-weight:700;letter-spacing:.5px}
+  .mira .laser{position:absolute;left:6px;right:6px;top:50%;height:2px;background:var(--rojo);box-shadow:0 0 8px var(--rojo);animation:scan 1.6s ease-in-out infinite}
+  @keyframes scan{0%,100%{top:15%}50%{top:85%}}
+  .scan-foot{padding:16px;background:linear-gradient(transparent,rgba(0,0,0,.7));color:#fff;text-align:center}
+  .scan-status{font-size:14px;font-weight:600;min-height:22px;margin-bottom:12px}
+  .scan-hint{font-size:12px;opacity:.8;margin-bottom:14px}
+  .scan-manual{background:rgba(255,255,255,.15);border:none;color:#fff;padding:11px 18px;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer}
+
+  .scan-result{position:absolute;left:16px;right:16px;bottom:24px;background:#fff;border-radius:20px;padding:20px;box-shadow:0 10px 40px rgba(0,0,0,.4);z-index:10;transform:translateY(120%);transition:transform .3s cubic-bezier(.2,.8,.2,1)}
+  .scan-result.show{transform:translateY(0)}
+  .scan-result .estado{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:800;margin-bottom:4px}
+  .scan-result.ok .estado{color:var(--ok)}
+  .scan-result.no .estado{color:var(--rojo)}
+  .scan-result.dup .estado{color:#c08a00}
+  .scan-result .estado .ic{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:20px;flex-shrink:0}
+  .scan-result.ok .estado .ic{background:var(--ok)}
+  .scan-result.no .estado .ic{background:var(--rojo)}
+  .scan-result.dup .estado .ic{background:#e5a500}
+  .scan-result .fac-leida{font-family:ui-monospace,monospace;font-size:22px;font-weight:800;margin:6px 0}
+  .scan-result .detalle{font-size:14px;color:var(--tinta);margin-bottom:4px}
+  .scan-result .sub{font-size:12.5px;color:var(--gris);margin-bottom:16px}
+  .scan-result .acciones{display:flex;gap:10px;flex-wrap:wrap}
+  .scan-result .acciones button{flex:1;min-width:110px;padding:14px;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer}
+  .btn-conf{background:var(--ok);color:#fff}
+  .btn-canc{background:#F0F1F3;color:var(--gris)}
+
+  .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%) translateY(20px);background:var(--tinta);color:#fff;padding:14px 20px;border-radius:14px;font-size:14px;font-weight:600;opacity:0;transition:.25s;z-index:300;max-width:90%;text-align:center;box-shadow:var(--sombra);pointer-events:none}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.err{background:var(--rojo)}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top" id="topBar">
+    <button class="back" id="btnBack" style="display:none" onclick="volver()">‹</button>
+    <div class="logo">P</div>
+    <div class="t"><h1 id="topTitulo">Carga en Patio</h1><p id="topSub">Provefabrica · Huachipa</p></div>
+    <span class="placa-badge" id="topPlaca" style="display:none"></span>
+    <button class="recarga" id="btnRecarga" onclick="recargar()" title="Recargar">↻</button>
+  </div>
+
+  <!-- cargando -->
+  <div class="pantalla activa" id="p-cargando">
+    <div class="centro"><div class="spin"></div><h2>Cargando programaciones…</h2><p>Trayendo las rutas del día desde la nube.</p></div>
+  </div>
+
+  <!-- error -->
+  <div class="pantalla" id="p-error">
+    <div class="centro"><div class="ic">📡</div><h2>No se pudo conectar</h2><p id="errMsg">Revisa la conexión a internet e intenta de nuevo.</p><button class="btn-grande" onclick="recargar()">Reintentar</button></div>
+  </div>
+
+  <!-- selector fecha -->
+  <div class="pantalla scroll" id="p-fechas"><div class="sel-fecha" id="selFecha"></div></div>
+
+  <!-- lista camiones -->
+  <div class="pantalla scroll" id="p-lista"><div class="lista-cam" id="listaCam"></div></div>
+
+  <!-- verificación -->
+  <div class="pantalla" id="p-verif">
+    <div class="contador" id="contador">
+      <div class="num" id="contNum">0</div>
+      <div class="txt"><b id="contBig">Verificando</b><span id="contSub">Escanea cada rótulo</span></div>
+    </div>
+    <button class="scan-launch" onclick="abrirScanner()"><span class="ic">📷</span> Escanear rótulo</button>
+    <div class="scroll"><div class="modo-lista" id="modoLista"></div></div>
+    <div class="cierre">
+      <input id="respInput" placeholder="Tu nombre (responsable de carga)">
+      <button class="btn-cerrar bloq" id="btnCerrar" onclick="autorizarSalida()">Autorizar salida</button>
+    </div>
+  </div>
+</div>
+
+<!-- escáner -->
+<div class="scanner" id="scanner">
+  <video id="video" playsinline muted></video>
+  <div class="scan-overlay">
+    <div class="scan-head">
+      <span class="placa" id="scanPlaca"></span>
+      <span style="font-size:13px">Apunta al # FACTURA</span>
+      <button class="cerrar-scan" onclick="cerrarScanner()">✕</button>
+    </div>
+    <div class="mira-wrap"><div class="mira"><div class="laser"></div></div></div>
+    <div class="scan-foot">
+      <div class="scan-status" id="scanStatus">Iniciando cámara…</div>
+      <div class="scan-hint">Encuadra solo el número que empieza en 10010 dentro del recuadro</div>
+      <button class="scan-manual" onclick="entradaManual()">Ingresar número a mano</button>
+    </div>
+  </div>
+  <div class="scan-result" id="scanResult">
+    <div class="estado"><span class="ic" id="resIc"></span><span id="resEstado"></span></div>
+    <div class="fac-leida" id="resFac"></div>
+    <div class="detalle" id="resDetalle"></div>
+    <div class="sub" id="resSub"></div>
+    <div class="acciones" id="resAcciones"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===== CONFIGURACIÓN (ya embebida — el auxiliar no toca nada) ===== */
+const NUBE_URL='https://script.google.com/macros/s/AKfycbzPfXZFs9GVEfBfDERzGGzxO8OgoRaMOHIg_QO9jOpMP31BkvENFenAP9rubgh_GPcW4Q/exec';
+
+/* ===== estado ===== */
+let PROGRAMAS=[];        // registros de la nube [{fecha, fechaTxt, pedidos[], unidades[]}]
+let PROG_ACT=null;       // programa seleccionado
+let CAMIONES={};         // placa -> {..., items[]}
+let PLACA_ACT=null;
+let stream=null, ocrWorker=null, scanning=false, scanBusy=false, pausado=false;
+const CONF_MIN=62, LECTURAS_OK=2;
+let ultima=null, contLect=0;
+
+const norm=s=>(s==null?'':String(s)).trim();
+const normFac=s=>String(s||'').replace(/\D/g,'');
+function buzz(ms){if(navigator.vibrate)navigator.vibrate(ms);}
+function beep(f=880,d=140){try{const a=new(window.AudioContext||window.webkitAudioContext)();const o=a.createOscillator(),g=a.createGain();o.connect(g);g.connect(a.destination);o.frequency.value=f;o.type='square';g.gain.value=.15;o.start();setTimeout(()=>{o.stop();a.close();},d);}catch(e){}}
+let toastT;function toast(m,err){const t=document.getElementById('toast');t.textContent=m;t.className='toast show'+(err?' err':'');clearTimeout(toastT);toastT=setTimeout(()=>t.className='toast',2200);}
+
+function extraerFactura(texto){const t=String(texto||'').replace(/\s+/g,' ');const m=t.match(/(?:^|[^\d])(10010\d{4})(?:[^\d]|$)/);return m?m[1]:null;}
+function dist1(a,b){a=String(a||'');b=String(b||'');if(a.length!==b.length||a===b)return false;let d=0;for(let i=0;i<a.length;i++){if(a[i]!==b[i]){d++;if(d>1)return false;}}return d===1;}
+
+function mostrar(id){document.querySelectorAll('.pantalla').forEach(p=>p.classList.remove('activa'));document.getElementById(id).classList.add('activa');}
+
+/* ===== cargar de la nube ===== */
+async function cargarNube(){
+  mostrar('p-cargando');
+  document.getElementById('btnBack').style.display='none';
+  document.getElementById('topPlaca').style.display='none';
+  try{
+    const res=await fetch(NUBE_URL+'?accion=listar');
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const data=await res.json();
+    if(!data||!data.ok)throw new Error((data&&data.error)||'Respuesta inválida del servidor');
+    let regs=data.registros||[];
+    // Agrupar por fecha: si hay varias del mismo día, conservar la más reciente (por guardadoEn)
+    const porFecha={};
+    regs.forEach(r=>{
+      const f=r.fecha||'';
+      const prev=porFecha[f];
+      if(!prev || (r.guardadoEn||'') > (prev.guardadoEn||'')) porFecha[f]=r;
+    });
+    PROGRAMAS=Object.values(porFecha).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+    if(!PROGRAMAS.length){document.getElementById('errMsg').textContent='No hay programaciones guardadas en la nube todavía. Pídele al supervisor que guarde la ruta del día.';mostrar('p-error');return;}
+    renderFechas();mostrar('p-fechas');
+  }catch(e){
+    document.getElementById('errMsg').textContent='No se pudo conectar con la nube ('+e.message+'). Revisa el internet e intenta de nuevo.';
+    mostrar('p-error');
+  }
+}
+function recargar(){PLACA_ACT=null;PROG_ACT=null;cargarNube();}
+
+/* ===== selector de fecha ===== */
+const MESES=['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SET','OCT','NOV','DIC'];
+function hoyISO(){return new Date().toISOString().slice(0,10);}
+function renderFechas(){
+  const cont=document.getElementById('selFecha');
+  const hoy=hoyISO();
+  cont.innerHTML='<h2>Elige la programación</h2>'+PROGRAMAS.map((p,idx)=>{
+    const iso=p.fecha||'';
+    const [y,m,d]=iso.split('-');
+    const esHoy=iso===hoy;
+    const nUnid=(p.unidades||[]).length, nPed=(p.pedidos||[]).filter(x=>!x.baja).length;
+    return `<div class="fecha-card ${esHoy?'hoy':''}" onclick="elegirPrograma(${idx})">
+      <div class="cal"><div class="d">${d||'--'}</div><div class="m">${MESES[(+m||1)-1]||''}</div></div>
+      <div class="info"><div class="f">${p.fechaTxt||iso}${esHoy?'<span class="badge-hoy">HOY</span>':''}</div><div class="r">${nUnid} camiones · ${nPed} facturas</div></div>
+      <div class="chev">›</div>
+    </div>`;
+  }).join('');
+}
+
+function elegirPrograma(idx){
+  PROG_ACT=PROGRAMAS[idx];
+  construirCamiones();
+  irLista();
+}
+
+/* ===== construir camiones desde el programa ===== */
+function construirCamiones(){
+  CAMIONES={};
+  const unidades=PROG_ACT.unidades||[];
+  const pedidos=PROG_ACT.pedidos||[];
+  const porUnit={};
+  unidades.forEach(u=>{
+    const placa=(u.placa||'').trim()||('Unidad '+u.id);
+    porUnit[u.id]={placa,ruta:u.ruta||'',personal:u.personal||''};
+    if(!CAMIONES[placa])CAMIONES[placa]={placa,ruta:u.ruta||'',personal:u.personal||'',items:[],cerrado:false,responsable:'',hora:''};
+  });
+  pedidos.filter(p=>p.unitId&&!p.baja).forEach(p=>{
+    const info=porUnit[p.unitId];if(!info)return;
+    const c=CAMIONES[info.placa];if(!c)return;
+    c.items.push({factura:(p.FACTURA||'').toString().trim(),facN:normFac(p.FACTURA),cliente:(p.CLIENTES||'').toString().trim(),distrito:(p.DISTRITO||'').toString().trim(),zona:(p.ZONA||'').toString().trim(),obs:(p.OBSERVACION||'').toString().trim(),marcado:false});
+  });
+  // quitar camiones sin facturas
+  Object.keys(CAMIONES).forEach(k=>{if(!CAMIONES[k].items.length)delete CAMIONES[k];});
+  cargarEstado();
+}
+
+/* ===== persistencia local del avance de carga (por fecha) ===== */
+function keyEstado(){return 'patio_nube_'+(PROG_ACT.fecha||'x');}
+function guardar(){
+  const data={};
+  Object.values(CAMIONES).forEach(c=>{data[c.placa]={cerrado:c.cerrado,responsable:c.responsable,hora:c.hora,marcadas:c.items.filter(i=>i.marcado).map(i=>i.factura)};});
+  try{localStorage.setItem(keyEstado(),JSON.stringify(data));}catch(e){}
+}
+function cargarEstado(){
+  let data={};try{data=JSON.parse(localStorage.getItem(keyEstado())||'{}');}catch(e){}
+  Object.values(CAMIONES).forEach(c=>{const s=data[c.placa];if(!s)return;c.cerrado=s.cerrado;c.responsable=s.responsable||'';c.hora=s.hora||'';const set=new Set(s.marcadas||[]);c.items.forEach(i=>{if(set.has(i.factura))i.marcado=true;});});
+}
+const estado=c=>{const t=c.items.length,ok=c.items.filter(i=>i.marcado).length;return{t,ok,falta:t-ok,pct:t?Math.round(ok/t*100):0,completo:ok===t&&t>0};};
+
+/* ===== lista de camiones ===== */
+function irLista(){
+  PLACA_ACT=null;
+  document.getElementById('btnBack').style.display='';
+  document.getElementById('topPlaca').style.display='none';
+  document.getElementById('topTitulo').textContent='Camiones';
+  document.getElementById('topSub').textContent=(PROG_ACT.fechaTxt||PROG_ACT.fecha||'')+' · toca tu camión';
+  renderLista();mostrar('p-lista');
+}
+function volver(){
+  if(PLACA_ACT){irLista();}
+  else{PROG_ACT=null;document.getElementById('topTitulo').textContent='Carga en Patio';document.getElementById('topSub').textContent='Provefabrica · Huachipa';document.getElementById('btnBack').style.display='none';renderFechas();mostrar('p-fechas');}
+}
+function renderLista(){
+  const cont=document.getElementById('listaCam');const cams=Object.values(CAMIONES);const pend=cams.filter(c=>!c.cerrado).length;
+  if(!cams.length){cont.innerHTML='<div class="centro"><div class="ic">📦</div><h2>Sin camiones</h2><p>Esta programación no tiene facturas asignadas a unidades.</p></div>';return;}
+  cont.innerHTML=`<h2>${cams.length} camiones · ${pend} por autorizar</h2>`+cams.map(c=>{const e=estado(c);const cls=c.cerrado?'cerrado':(e.completo?'completo':'');
+    return `<div class="cam-card ${cls}" onclick="abrirCamion('${c.placa.replace(/'/g,"")}')"><span class="placa">${c.placa}</span><div class="info"><div class="r">${c.ruta?('Ruta '+c.ruta):'—'}</div><div class="z">${c.personal||'Sin asignar'}</div><div class="mini-barra"><span style="width:${e.pct}%"></span></div></div><div class="prog"><div class="big">${c.cerrado?'✓':e.pct+'%'}</div><div class="lbl">${c.cerrado?'autorizado':e.ok+'/'+e.t}</div></div></div>`;}).join('');
+}
+
+/* ===== verificación ===== */
+function abrirCamion(p){
+  PLACA_ACT=p;const c=CAMIONES[p];
+  document.getElementById('btnBack').style.display='';
+  document.getElementById('topPlaca').style.display='';document.getElementById('topPlaca').textContent=p;
+  document.getElementById('topTitulo').textContent=c.ruta?('Ruta '+c.ruta):'Verificación';
+  document.getElementById('topSub').textContent=c.personal||'';
+  document.getElementById('respInput').value=c.responsable||'';
+  mostrar('p-verif');renderVerif();
+}
+function renderVerif(){
+  const c=CAMIONES[PLACA_ACT];const e=estado(c);
+  const cont=document.getElementById('contador');cont.classList.toggle('completo',e.completo);
+  document.getElementById('contNum').textContent=e.completo?'✓':e.falta;
+  document.getElementById('contBig').textContent=e.completo?'Todo cargado':`Faltan ${e.falta} de ${e.t}`;
+  document.getElementById('contSub').textContent=e.completo?'Listo para autorizar':'Escanea cada rótulo al subirlo';
+  const btn=document.getElementById('btnCerrar');
+  if(c.cerrado){btn.className='btn-cerrar hecho';btn.textContent='✓ Salida autorizada';}
+  else if(e.completo){btn.className='btn-cerrar';btn.textContent='Autorizar salida';}
+  else{btn.className='btn-cerrar bloq';btn.textContent=`Faltan ${e.falta} — no autorizar`;}
+  document.getElementById('modoLista').innerHTML=c.items.map((i,idx)=>`
+    <div class="li-item ${i.marcado?'on':''}" onclick="toggleLista(${idx})">
+      <div class="li-chk">${i.marcado?'✓':''}</div>
+      <div class="li-info"><div class="fac">${i.factura||'—'}</div><div class="cli">${i.cliente||'—'}</div><div class="dist">${i.distrito||''} ${i.zona?('· '+i.zona):''}</div>${i.obs?`<span class="obs-tag">⚠ ${i.obs}</span>`:''}</div>
+    </div>`).join('');
+}
+function toggleLista(idx){const c=CAMIONES[PLACA_ACT];if(c.cerrado){toast('Camión ya autorizado',true);return;}const i=c.items[idx];i.marcado=!i.marcado;if(i.marcado){buzz(60);beep(900,120);}else buzz(30);guardar();renderVerif();}
+document.getElementById('respInput').addEventListener('change',e=>{if(PLACA_ACT){CAMIONES[PLACA_ACT].responsable=e.target.value;guardar();}});
+function autorizarSalida(){
+  const c=CAMIONES[PLACA_ACT];const e=estado(c);
+  if(c.cerrado){toast('Ya fue autorizada');return;}
+  if(!e.completo){buzz([80,50,80,50,80]);beep(300,400);toast(`No se puede: faltan ${e.falta} factura(s)`,true);return;}
+  if(!c.responsable||!c.responsable.trim()){toast('Escribe tu nombre antes de autorizar',true);document.getElementById('respInput').focus();return;}
+  c.cerrado=true;c.hora=new Date().toLocaleString('es-PE');guardar();beep(1200,200);buzz(150);toast('✓ Salida autorizada');renderVerif();setTimeout(irLista,1100);
+}
+
+/* ===== escáner ===== */
+async function initOcr(){if(ocrWorker)return ocrWorker;toast('Preparando escáner…');ocrWorker=await Tesseract.createWorker('eng');await ocrWorker.setParameters({tessedit_char_whitelist:'0123456789',tessedit_pageseg_mode:'7'});return ocrWorker;}
+function resetEstab(){ultima=null;contLect=0;}
+async function abrirScanner(){
+  const c=CAMIONES[PLACA_ACT];if(c.cerrado){toast('Camión ya autorizado',true);return;}
+  document.getElementById('scanPlaca').textContent=PLACA_ACT;
+  document.getElementById('scanner').classList.add('show');
+  document.getElementById('scanResult').classList.remove('show','ok','no','dup');
+  pausado=false;scanBusy=false;resetEstab();
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080},focusMode:'continuous',advanced:[{focusMode:'continuous'}]}});
+    const v=document.getElementById('video');v.srcObject=stream;await v.play();
+    // intentar activar enfoque continuo si el dispositivo lo permite
+    try{const track=stream.getVideoTracks()[0];const caps=track.getCapabilities&&track.getCapabilities();if(caps&&caps.focusMode&&caps.focusMode.includes('continuous')){await track.applyConstraints({advanced:[{focusMode:'continuous'}]});}}catch(e){}
+    document.getElementById('scanStatus').textContent='Enfocando… acerca el rótulo';
+    await initOcr();scanning=true;bucle();
+  }catch(err){document.getElementById('scanStatus').textContent='No se pudo abrir la cámara';toast('Sin acceso a cámara. Usa entrada manual.',true);}
+}
+function cerrarScanner(){scanning=false;document.getElementById('scanner').classList.remove('show');if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}}
+async function bucle(){
+  if(!scanning)return;
+  if(pausado||scanBusy){requestAnimationFrame(bucle);return;}
+  scanBusy=true;
+  try{
+    const v=document.getElementById('video');
+    if(v.videoWidth){
+      const cw=v.videoWidth,ch=v.videoHeight;
+      // franja más ajustada a la mira (más chica = OCR más rápido)
+      const sw=cw*0.80,sh=ch*0.15,sx=(cw-sw)/2,sy=(ch-sh)/2;
+      const cv=document.createElement('canvas');
+      // sin upscale: procesar a tamaño nativo de la franja (mucho más rápido)
+      cv.width=sw;cv.height=sh;
+      const ctx=cv.getContext('2d');ctx.drawImage(v,sx,sy,sw,sh,0,0,cv.width,cv.height);
+      const img=ctx.getImageData(0,0,cv.width,cv.height),d=img.data;
+      for(let i=0;i<d.length;i+=4){const g=0.3*d[i]+0.59*d[i+1]+0.11*d[i+2];const bw=g>135?255:0;d[i]=d[i+1]=d[i+2]=bw;}
+      ctx.putImageData(img,0,0);
+      const {data}=await ocrWorker.recognize(cv);
+      const conf=data.confidence||0,fac=extraerFactura(data.text);
+      if(fac&&conf>=CONF_MIN){
+        // estabilidad inteligente: si el número EXISTE en el camión, aceptar de inmediato (riesgo mínimo);
+        // si no existe, exigir 2 lecturas antes de declararlo "no pertenece"
+        const existe=CAMIONES[PLACA_ACT].items.some(i=>i.facN===fac);
+        if(existe){resetEstab();procesar(fac);}
+        else{
+          if(fac===ultima){contLect++;if(contLect>=2){const cap=fac;resetEstab();procesar(cap);}}
+          else{ultima=fac;contLect=1;}
+          if(!pausado)document.getElementById('scanStatus').textContent='Leyendo '+fac+'…';
+        }
+      }else if(fac&&conf<CONF_MIN){if(!pausado)document.getElementById('scanStatus').textContent='Acerca más / mejora la luz…';ultima=null;contLect=0;}
+      else{if(!pausado)document.getElementById('scanStatus').textContent='Buscando el número…';}
+    }
+  }catch(e){}
+  scanBusy=false;
+  // sin pausa: reintentar de inmediato cediendo el hilo solo lo mínimo
+  if(scanning)requestAnimationFrame(bucle);
+}
+function procesar(facN){
+  const c=CAMIONES[PLACA_ACT];const item=c.items.find(i=>i.facN===facN);
+  const res=document.getElementById('scanResult');pausado=true;
+  if(!item){
+    let otro=null;for(const cc of Object.values(CAMIONES)){if(cc.items.find(i=>i.facN===facN)){otro=cc.placa;break;}}
+    const cercanas=c.items.filter(i=>dist1(i.facN,facN)).slice(0,3);
+    beep(300,350);buzz([80,50,80]);
+    res.className='scan-result show no';
+    document.getElementById('resIc').textContent='✕';
+    document.getElementById('resEstado').textContent='NO pertenece a este camión';
+    document.getElementById('resFac').textContent=facN;
+    document.getElementById('resDetalle').innerHTML=otro?('Esta factura está programada en <b>'+otro+'</b>'):'Esta factura no está en la programación de hoy';
+    if(cercanas.length&&!otro){document.getElementById('resSub').textContent='¿Quisiste decir una de estas? El escáner pudo confundir un dígito:';document.getElementById('resAcciones').innerHTML=cercanas.map(i=>`<button class="btn-conf" onclick="procesar('${i.facN}')">${i.factura}</button>`).join('')+`<button class="btn-canc" onclick="reanudar()">Ninguna</button>`;}
+    else{document.getElementById('resSub').textContent=otro?'No la subas a este camión.':'Verifica el rótulo o consúltalo con el supervisor.';document.getElementById('resAcciones').innerHTML=`<button class="btn-canc" onclick="reanudar()">Seguir escaneando</button>`;}
+    return;
+  }
+  if(item.marcado){beep(600,200);buzz(50);res.className='scan-result show dup';document.getElementById('resIc').textContent='!';document.getElementById('resEstado').textContent='Ya estaba marcada';document.getElementById('resFac').textContent=item.factura;document.getElementById('resDetalle').innerHTML='<b>'+(item.cliente||'—')+'</b>';document.getElementById('resSub').textContent='Esta factura ya fue cargada antes.';document.getElementById('resAcciones').innerHTML=`<button class="btn-canc" onclick="reanudar()">Seguir escaneando</button>`;return;}
+  beep(950,150);buzz(80);res.className='scan-result show ok';document.getElementById('resIc').textContent='✓';document.getElementById('resEstado').textContent='Pertenece a este camión';document.getElementById('resFac').textContent=item.factura;document.getElementById('resDetalle').innerHTML='<b>'+(item.cliente||'—')+'</b> · '+(item.distrito||'');document.getElementById('resSub').textContent=item.obs?('⚠ '+item.obs):'Confirma para marcar como cargada.';
+  const idx=c.items.indexOf(item);
+  document.getElementById('resAcciones').innerHTML=`<button class="btn-canc" onclick="reanudar()">Cancelar</button><button class="btn-conf" onclick="confirmar(${idx})">✓ Confirmar carga</button>`;
+}
+function confirmar(idx){const c=CAMIONES[PLACA_ACT];const it=c.items[idx];if(it){it.marcado=true;guardar();beep(1100,160);buzz(120);}const e=estado(c);if(e.completo){toast('✓ Camión completo');cerrarScanner();renderVerif();return;}reanudar();renderVerif();}
+function reanudar(){document.getElementById('scanResult').classList.remove('show');resetEstab();setTimeout(()=>{pausado=false;if(scanning)requestAnimationFrame(bucle);},250);}
+function entradaManual(){pausado=true;const v=prompt('Ingresa el número de factura (los 9 dígitos, ej. 100106782):');if(!v){pausado=false;return;}const facN=normFac(v);if(facN.length<6){toast('Número muy corto — revísalo',true);pausado=false;return;}procesar(facN);}
+
+/* ===== arranque ===== */
+cargarNube();
+</script>
+</body>
+</html>
