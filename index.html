@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#E1001A">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icono-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Carga Patio">
+<meta name="mobile-web-app-capable" content="yes">
 <title>Carga en Patio — Provefabrica</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
@@ -28,7 +34,42 @@
   .top .back{background:rgba(255,255,255,.18);border:none;color:#fff;font-size:20px;width:34px;height:34px;border-radius:8px;cursor:pointer}
   .top .recarga{background:rgba(255,255,255,.18);border:none;color:#fff;font-size:17px;width:34px;height:34px;border-radius:8px;cursor:pointer}
 
-  .scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  /*  min-height:0 es imprescindible: un hijo flex no se encoge por debajo de
+      su contenido por defecto, así que sin esto la lista crecía a lo alto,
+      .app la recortaba y no había nada que desplazar. Con la pantalla de
+      fechas, que ahora lleva el buscador arriba, eso dejó el scroll muerto. */
+  .scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
+
+  /* ===== pasos (arriba) ===== */
+  .pasos{display:flex;background:var(--panel);border-bottom:1px solid var(--linea);flex-shrink:0}
+  .paso{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;
+    padding:11px 4px;border:0;background:none;font-family:inherit;font-size:12.5px;
+    font-weight:700;color:var(--gris);cursor:pointer;position:relative;
+    border-bottom:3px solid transparent;transition:color .15s,border-color .15s}
+  .paso b{font-weight:800}
+  .paso .cnt{min-width:19px;height:19px;padding:0 5px;border-radius:20px;background:#EBEDF1;
+    color:var(--gris);font-size:10.5px;font-weight:800;line-height:19px;text-align:center}
+  .paso.on{color:var(--rojo);border-bottom-color:var(--rojo)}
+  .paso.on .cnt{background:var(--rojo);color:#fff}
+  /* un paso al que todavía no se puede llegar no se oculta: se apaga, para que
+     el auxiliar vea cuántos pasos tiene el trabajo desde el principio */
+  .paso:disabled{opacity:.38;cursor:default}
+
+  /* ===== barra inferior ===== */
+  .navbar{display:flex;background:var(--panel);border-top:1px solid var(--linea);flex-shrink:0;
+    padding-bottom:env(safe-area-inset-bottom)}
+  .nb{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 4px 8px;
+    border:0;background:none;font-family:inherit;font-size:11px;font-weight:700;
+    color:var(--gris);cursor:pointer;transition:color .15s}
+  .nb .i{font-size:17px;line-height:1}
+  .nb.on{color:var(--rojo)}
+  .navbar.oculta{display:none}
+
+  /* botón de instalar: solo aparece si el celular ofrece instalarla */
+  .instalar{background:rgba(255,255,255,.18);color:#fff;border:1.5px solid rgba(255,255,255,.55);
+    border-radius:20px;padding:6px 13px;font-family:inherit;font-size:12px;font-weight:800;
+    cursor:pointer;flex-shrink:0;white-space:nowrap}
+  .instalar:active{background:rgba(255,255,255,.3)}
   .pantalla{display:none;flex-direction:column;height:100%}
   .pantalla.activa{display:flex}
 
@@ -184,7 +225,15 @@
     <div class="logo">P</div>
     <div class="t"><h1 id="topTitulo">Carga en Patio</h1><p id="topSub">Provefabrica · Huachipa</p></div>
     <span class="placa-badge" id="topPlaca" style="display:none"></span>
+    <button class="instalar" id="btnInstalar" style="display:none" onclick="instalarApp()">Instalar</button>
     <button class="recarga" id="btnRecarga" onclick="recargar()" title="Recargar">↻</button>
+  </div>
+
+  <!-- pasos: dónde estoy en el flujo. Mismo criterio que el planificador. -->
+  <div class="pasos" id="pasos">
+    <button class="paso" id="paso1" onclick="irPaso(1)"><b>1 · Fecha</b><span class="cnt" id="cnt1">0</span></button>
+    <button class="paso" id="paso2" onclick="irPaso(2)"><b>2 · Camión</b><span class="cnt" id="cnt2">0</span></button>
+    <button class="paso" id="paso3" onclick="irPaso(3)"><b>3 · Carga</b><span class="cnt" id="cnt3">0</span></button>
   </div>
 
   <!-- cargando -->
@@ -219,6 +268,14 @@
       <button class="btn-cerrar bloq" id="btnCerrar" onclick="autorizarSalida()">Autorizar salida</button>
     </div>
   </div>
+
+  <!-- barra inferior: el mismo criterio en los tres pasos —
+       todo / lo que falta / lo hecho. Se aprende una vez y sirve siempre. -->
+  <nav class="navbar" id="navbar">
+    <button class="nb" data-f="todo"  onclick="filtroNav('todo')"><span class="i" id="nbi1">▦</span><span id="nbt1">Todas</span></button>
+    <button class="nb" data-f="falta" onclick="filtroNav('falta')"><span class="i" id="nbi2">◷</span><span id="nbt2">Próximas</span></button>
+    <button class="nb" data-f="hecho" onclick="filtroNav('hecho')"><span class="i" id="nbi3">✓</span><span id="nbt3">Anteriores</span></button>
+  </nav>
 </div>
 
 <!-- escáner -->
@@ -306,11 +363,64 @@ function facturaEnTexto(texto, itemsCamion){
 
 function mostrar(id){document.querySelectorAll('.pantalla').forEach(p=>p.classList.remove('activa'));document.getElementById(id).classList.add('activa');}
 
+/* ===== cáscara de aplicación: pasos arriba, barra abajo =====
+   El flujo del patio ya era de tres pasos (fecha → camión → carga); esto
+   solo lo hace visible. La barra de abajo usa el mismo criterio en los tres:
+   todo / lo que falta / lo hecho, para que se aprenda una sola vez. */
+let PASO=1;
+const FILTRO={1:'todo',2:'todo',3:'todo'};
+const ETIQ={
+  1:{todo:'Todas', falta:'Próximas', hecho:'Anteriores', i:['▦','◷','↩']},
+  2:{todo:'Todos', falta:'Pendientes', hecho:'Listos',   i:['▦','◷','✓']},
+  3:{todo:'Todas', falta:'Faltan',     hecho:'Cargadas', i:['▦','◷','✓']}
+};
+
+function pintarCascara(){
+  const enFlujo = PASO>=1 && PROGRAMAS.length>0;
+  document.getElementById('pasos').style.display = enFlujo?'':'none';
+  document.getElementById('navbar').classList.toggle('oculta', !enFlujo);
+  if(!enFlujo) return;
+
+  // contadores: lo que hay para elegir en cada paso
+  const nCam = PROG_ACT?Object.keys(CAMIONES).length:0;
+  const nFac = PLACA_ACT&&CAMIONES[PLACA_ACT]?CAMIONES[PLACA_ACT].items.length:0;
+  const cnt={1:PROGRAMAS.length, 2:nCam, 3:nFac};
+  for(let i=1;i<=3;i++){
+    const b=document.getElementById('paso'+i);
+    b.classList.toggle('on', PASO===i);
+    // solo se puede ir a un paso ya alcanzado; los de adelante se apagan
+    b.disabled = (i===2&&!PROG_ACT) || (i===3&&!PLACA_ACT);
+    document.getElementById('cnt'+i).textContent=cnt[i];
+  }
+  const e=ETIQ[PASO];
+  ['todo','falta','hecho'].forEach((f,k)=>{
+    document.getElementById('nbt'+(k+1)).textContent=e[f];
+    document.getElementById('nbi'+(k+1)).textContent=e.i[k];
+  });
+  document.querySelectorAll('.nb').forEach(b=>b.classList.toggle('on', b.dataset.f===FILTRO[PASO]));
+}
+
+function irPaso(n){
+  if(n===PASO) return;
+  if(n===1){ volverAFechas(); return; }
+  if(n===2){ if(PROG_ACT) irLista(); return; }
+  if(n===3){ if(PLACA_ACT) abrirCamion(PLACA_ACT); }
+}
+
+function filtroNav(f){
+  FILTRO[PASO]=f;
+  if(PASO===1)renderSelFechas(); else if(PASO===2)renderLista(); else renderVerif();
+  pintarCascara();
+}
+
 /* ===== cargar de la nube ===== */
 async function cargarNube(){
   mostrar('p-cargando');
   document.getElementById('btnBack').style.display='none';
   document.getElementById('topPlaca').style.display='none';
+  // mientras carga, o si falla, la cáscara no tiene nada que mostrar
+  document.getElementById('pasos').style.display='none';
+  document.getElementById('navbar').classList.add('oculta');
   try{
     /* POST con las credenciales en el cuerpo, igual que el planificador y el
        registro de errores. text/plain evita el preflight CORS de Apps Script.
@@ -363,7 +473,7 @@ async function cargarNube(){
     });
     PROGRAMAS=Object.values(porFecha).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
     if(!PROGRAMAS.length){document.getElementById('errMsg').textContent='No hay programaciones guardadas en la nube todavía. Pídele al supervisor que guarde la ruta del día.';mostrar('p-error');return;}
-    renderFechas();mostrar('p-fechas');
+    renderFechas();mostrar('p-fechas');pintarCascara();
   }catch(e){
     document.getElementById('errMsg').textContent = e.esAcceso
       ? 'El servidor rechazó el acceso: '+e.message+'. Avisa al supervisor — no es problema de tu internet.'
@@ -371,7 +481,7 @@ async function cargarNube(){
     mostrar('p-error');
   }
 }
-function recargar(){PLACA_ACT=null;PROG_ACT=null;cargarNube();}
+function recargar(){PLACA_ACT=null;PROG_ACT=null;PASO=1;cargarNube();}
 
 /* ===== selector de fecha ===== */
 const MESES=['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SET','OCT','NOV','DIC'];
@@ -497,19 +607,27 @@ function renderSelFechas(){
       Cuando no hay nada de hoy, la primera tarjeta de Anteriores es la
       última carga y la primera de Próximas es la que viene: no hace falta
       destacarlas aparte.  */
+  /*  La barra de abajo recorta lo que se muestra, no reordena: "Próximas"
+      deja hoy y lo que viene, "Anteriores" solo lo ya cargado. */
+  const f1=FILTRO[1];
+  const verProx=f1!=='hecho', verAnt=f1!=='falta';
   let h='';
-  if(hoy.length){
+  if(verProx&&hoy.length){
     h+='<h2>'+(hoy.length>1?'Programaciones de hoy':'Programación de hoy')+'</h2>'+pinta(hoy,true);
   }
-  if(prox.length)h+='<h2>Próximas</h2>'+pinta(prox,false);
-  if(ant.length){
-    const lim=VER_ANTERIORES?ant.length:5;
+  if(verProx&&prox.length)h+='<h2>Próximas</h2>'+pinta(prox,false);
+  if(verProx&&!verAnt&&!hoy.length&&!prox.length)
+    h+='<p class="vacio">No hay programación de hoy ni próximas. Toca «Anteriores» abajo para ver las ya cargadas.</p>';
+  if(verAnt&&ant.length){
+    // mirando solo "Anteriores" no tiene sentido esconderlas tras un botón
+    const lim=(VER_ANTERIORES||f1==='hecho')?ant.length:5;
     h+='<h2>Anteriores</h2>'+pinta(ant.slice(0,lim),false);
     if(ant.length>lim){
       const r=ant.length-lim;
       h+='<button class="fver" onclick="VER_ANTERIORES=true;renderSelFechas()">Ver '+r+(r===1?' anterior':' anteriores')+'</button>';
     }
   }
+  if(verAnt&&!verProx&&!ant.length)h+='<p class="vacio">Todavía no hay programaciones anteriores.</p>';
   if(sinF.length){
     h+='<h2>Sin fecha reconocida</h2>'+pinta(sinF,false)+
        '<p class="vacio">La fecha de estas programaciones no se pudo leer. Revísalas en el planificador.</p>';
@@ -568,16 +686,33 @@ function irLista(){
   const turnoAct=kAct.turno!==1?(' · '+etiquetaTurno(kAct)):'';
   document.getElementById('topSub').textContent=
     (PROG_ACT.fechaTxt||kAct.iso||PROG_ACT.fecha||'')+turnoAct+' · toca tu camión';
-  renderLista();mostrar('p-lista');
+  PASO=2;PLACA_ACT=null;
+  renderLista();mostrar('p-lista');pintarCascara();
 }
 function volver(){
   if(PLACA_ACT){irLista();}
-  else{PROG_ACT=null;document.getElementById('topTitulo').textContent='Carga en Patio';document.getElementById('topSub').textContent='Provefabrica · Huachipa';document.getElementById('btnBack').style.display='none';renderFechas();mostrar('p-fechas');}
+  else{volverAFechas();}
+}
+function volverAFechas(){
+  PROG_ACT=null;PLACA_ACT=null;PASO=1;
+  document.getElementById('topTitulo').textContent='Carga en Patio';
+  document.getElementById('topSub').textContent='Provefabrica · Huachipa';
+  document.getElementById('topPlaca').style.display='none';
+  document.getElementById('btnBack').style.display='none';
+  renderFechas();mostrar('p-fechas');pintarCascara();
 }
 function renderLista(){
-  const cont=document.getElementById('listaCam');const cams=Object.values(CAMIONES);const pend=cams.filter(c=>!c.cerrado).length;
-  if(!cams.length){cont.innerHTML='<div class="centro"><div class="ic">📦</div><h2>Sin camiones</h2><p>Esta programación no tiene facturas asignadas a unidades.</p></div>';return;}
-  cont.innerHTML=`<h2>${cams.length} camiones · ${pend} por autorizar</h2>`+cams.map(c=>{const e=estado(c);const cls=c.cerrado?'cerrado':(e.completo?'completo':'');
+  const cont=document.getElementById('listaCam');const todos=Object.values(CAMIONES);const pend=todos.filter(c=>!c.cerrado).length;
+  if(!todos.length){cont.innerHTML='<div class="centro"><div class="ic">📦</div><h2>Sin camiones</h2><p>Esta programación no tiene facturas asignadas a unidades.</p></div>';return;}
+  const f=FILTRO[2];
+  const cams=f==='falta'?todos.filter(c=>!c.cerrado):f==='hecho'?todos.filter(c=>c.cerrado):todos;
+  if(!cams.length){
+    cont.innerHTML='<div class="centro"><div class="ic">'+(f==='falta'?'✓':'⏳')+'</div><h2>'+
+      (f==='falta'?'Ningún camión pendiente':'Ningún camión autorizado todavía')+'</h2><p>'+
+      (f==='falta'?'Los '+todos.length+' camiones ya salieron autorizados.':'Aún no se autoriza ninguna salida. Toca «Pendientes» para ver los que faltan.')+'</p></div>';
+    return;
+  }
+  cont.innerHTML=`<h2>${cams.length===todos.length?todos.length+' camiones · '+pend+' por autorizar':cams.length+' de '+todos.length+' camiones'}</h2>`+cams.map(c=>{const e=estado(c);const cls=c.cerrado?'cerrado':(e.completo?'completo':'');
     return `<div class="cam-card ${cls}" onclick="abrirCamion('${c.placa.replace(/'/g,"")}')"><span class="placa">${c.placa}</span><div class="info"><div class="r">${c.ruta?('Ruta '+c.ruta):'—'}</div><div class="z">${c.personal||'Sin asignar'}</div><div class="mini-barra"><span style="width:${e.pct}%"></span></div></div><div class="prog"><div class="big">${c.cerrado?'✓':e.pct+'%'}</div><div class="lbl">${c.cerrado?'autorizado':e.ok+'/'+e.t}</div></div></div>`;}).join('');
 }
 
@@ -589,7 +724,8 @@ function abrirCamion(p){
   document.getElementById('topTitulo').textContent=c.ruta?('Ruta '+c.ruta):'Verificación';
   document.getElementById('topSub').textContent=c.personal||'';
   document.getElementById('respInput').value=c.responsable||'';
-  mostrar('p-verif');renderVerif();
+  PASO=3;
+  mostrar('p-verif');renderVerif();pintarCascara();
   // precargar el motor OCR en segundo plano para que al tocar "Escanear" ya esté listo
   if(!ocrListo){initOcr().catch(()=>{});}
 }
@@ -603,13 +739,22 @@ function renderVerif(){
   if(c.cerrado){btn.className='btn-cerrar hecho';btn.textContent='✓ Salida autorizada';}
   else if(e.completo){btn.className='btn-cerrar';btn.textContent='Autorizar salida';}
   else{btn.className='btn-cerrar bloq';btn.textContent=`Faltan ${e.falta} — no autorizar`;}
-  document.getElementById('modoLista').innerHTML=c.items.map((i,idx)=>`
+  /*  Ojo: toggleLista recibe la posición dentro de c.items. Si filtro la lista
+      sin conservar el índice original, marcaría la factura equivocada — y en
+      el patio eso significa autorizar un camión con carga incompleta. Por eso
+      se numera ANTES de filtrar. */
+  const fv=FILTRO[3];
+  const conIdx=c.items.map((i,idx)=>({i,idx}));
+  const vis=fv==='falta'?conIdx.filter(x=>!x.i.marcado):fv==='hecho'?conIdx.filter(x=>x.i.marcado):conIdx;
+  document.getElementById('modoLista').innerHTML = vis.length ? vis.map(({i,idx})=>`
     <div class="li-item ${i.marcado?'on':''}" onclick="toggleLista(${idx})">
       <div class="li-chk">${i.marcado?'✓':''}</div>
       <div class="li-info"><div class="fac">${i.factura||'—'}</div><div class="cli">${i.cliente||'—'}</div><div class="dist">${i.distrito||''} ${i.zona?('· '+i.zona):''}</div>${i.obs?`<span class="obs-tag">⚠ ${i.obs}</span>`:''}</div>
-    </div>`).join('');
+    </div>`).join('')
+    : '<p class="vacio" style="padding:22px 16px;text-align:center">'+
+      (fv==='falta'?'No falta ninguna factura: todas están cargadas.':'Todavía no has cargado ninguna factura de este camión.')+'</p>';
 }
-function toggleLista(idx){const c=CAMIONES[PLACA_ACT];if(c.cerrado){toast('Camión ya autorizado',true);return;}const i=c.items[idx];i.marcado=!i.marcado;if(i.marcado){buzz(60);beep(900,120);}else buzz(30);guardar();renderVerif();}
+function toggleLista(idx){const c=CAMIONES[PLACA_ACT];if(c.cerrado){toast('Camión ya autorizado',true);return;}const i=c.items[idx];i.marcado=!i.marcado;if(i.marcado){buzz(60);beep(900,120);}else buzz(30);guardar();renderVerif();pintarCascara();}
 document.getElementById('respInput').addEventListener('change',e=>{if(PLACA_ACT){CAMIONES[PLACA_ACT].responsable=e.target.value;guardar();}});
 function autorizarSalida(){
   const c=CAMIONES[PLACA_ACT];const e=estado(c);
@@ -741,6 +886,38 @@ function procesar(facLeida){
 function confirmar(idx){const c=CAMIONES[PLACA_ACT];const it=c.items[idx];if(it){it.marcado=true;guardar();beep(1100,160);buzz(120);}const e=estado(c);if(e.completo){toast('✓ Camión completo');cerrarScanner();renderVerif();return;}reanudar();renderVerif();}
 function reanudar(){document.getElementById('scanResult').classList.remove('show');resetEstab();setTimeout(()=>{pausado=false;if(scanning)requestAnimationFrame(bucle);},250);}
 function entradaManual(){pausado=true;const v=prompt('Ingresa el número de factura (ej. 100106782 o REP-1234):');if(!v){pausado=false;return;}const f=String(v).trim();if(f.length<4){toast('Muy corto — revísalo',true);pausado=false;return;}procesar(f);}
+
+/* ===== instalación en el celular =====
+   Chrome avisa cuando la app se puede instalar; hasta entonces el botón no
+   existe. No se fuerza ni se insiste: si ya está instalada, o el navegador
+   no lo permite, simplemente no aparece nada. */
+let pedidoInstalar=null;
+window.addEventListener('beforeinstallprompt',ev=>{
+  ev.preventDefault();
+  pedidoInstalar=ev;
+  document.getElementById('btnInstalar').style.display='';
+});
+window.addEventListener('appinstalled',()=>{
+  pedidoInstalar=null;
+  document.getElementById('btnInstalar').style.display='none';
+  toast('✓ Instalada. Búscala en tu pantalla de inicio');
+});
+async function instalarApp(){
+  if(!pedidoInstalar){
+    toast('Usa el menú ⋮ del navegador → «Instalar aplicación»');
+    return;
+  }
+  pedidoInstalar.prompt();
+  try{ await pedidoInstalar.userChoice; }catch(e){}
+  pedidoInstalar=null;
+  document.getElementById('btnInstalar').style.display='none';
+}
+if('serviceWorker' in navigator){
+  // tras la carga, para no competir con la primera petición a la nube
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
 
 /* ===== arranque ===== */
 cargarNube();
