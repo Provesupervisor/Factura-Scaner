@@ -70,7 +70,12 @@
     border-radius:20px;padding:6px 13px;font-family:inherit;font-size:12px;font-weight:800;
     cursor:pointer;flex-shrink:0;white-space:nowrap}
   .instalar:active{background:rgba(255,255,255,.3)}
-  .pantalla{display:none;flex-direction:column;height:100%}
+  /*  flex:1 + min-height:0, NO height:100%. Con height:100% la pantalla activa
+      reclamaba toda la altura de .app, pero arriba están la cabecera y las
+      pestañas y abajo la barra: la suma se pasaba, .app recortaba, la barra
+      inferior quedaba fuera de la vista y la lista de dentro nunca recibía
+      una altura acotada, así que no había nada que desplazar. */
+  .pantalla{display:none;flex-direction:column;flex:1;min-height:0}
   .pantalla.activa{display:flex}
 
   /* estados generales (cargando / error) */
